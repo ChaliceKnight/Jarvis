@@ -361,7 +361,7 @@ footer{
     <button id="unlockBtn">UNLOCK</button>
     <div class="lock-error" id="lockError"></div>
   </div>
-  <div class="lock-hint">This instance is connected to Claude and restricted to authorized use only.</div>
+  <div class="lock-hint">This instance is restricted to authorized use only. Free web lookup mode — no accounts, no API keys, no cost.</div>
 </div>
 
 <header>
@@ -389,10 +389,12 @@ footer{
 
     <h3 style="margin-top:26px;">QUICK COMMANDS</h3>
     <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-dim);line-height:1.9;">
-      <div>Ask me anything</div>
-      <div>"What's the latest on…"</div>
+      <div>"What is the Eiffel Tower"</div>
+      <div>"Who is Marie Curie"</div>
       <div>"What time is it"</div>
       <div>"What's the date"</div>
+      <div>"Calculate 12 times 8"</div>
+      <div>"Tell me a joke"</div>
       <div>"Clear log"</div>
     </div>
   </section>
@@ -437,11 +439,13 @@ footer{
   </section>
 </main>
 
-<footer>CONNECTED TO CLAUDE · ACCESS RESTRICTED · WEB SEARCH ENABLED</footer>
+<footer>FREE WEB LOOKUP MODE · NO API KEYS · NO COST · WIKIPEDIA + GOOGLE FALLBACK</footer>
 
 <script>
-// ===== CONFIG: paste your deployed Worker URL here =====
-const WORKER_URL = 'https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev';
+// ===== CONFIG: set your own passphrase here before publishing =====
+// This is a casual gate, not real security — anyone who views the page
+// source can see this value. It just keeps random visitors out.
+const JARVIS_PASSPHRASE = 'Excalibur';
 
 const body = document.body;
 const micBtn = document.getElementById('micBtn');
@@ -459,17 +463,10 @@ const passphraseInput = document.getElementById('passphraseInput');
 const unlockBtn = document.getElementById('unlockBtn');
 const lockError = document.getElementById('lockError');
 
-let passphrase = localStorage.getItem('jarvis_passphrase') || '';
-let conversationHistory = [];
+let unlocked = localStorage.getItem('jarvis_unlocked') === 'true';
 
-function tryUnlock(pass){
-  passphrase = pass;
+if(unlocked){
   lockOverlay.style.display = 'none';
-  localStorage.setItem('jarvis_passphrase', pass);
-}
-
-if(passphrase){
-  tryUnlock(passphrase);
 } else {
   lockOverlay.style.display = 'flex';
   setTimeout(()=>passphraseInput.focus(), 100);
@@ -477,22 +474,18 @@ if(passphrase){
 
 unlockBtn.addEventListener('click', ()=>{
   const val = passphraseInput.value.trim();
-  if(!val){ lockError.textContent = 'Enter a passphrase.'; return; }
-  lockError.textContent = '';
-  tryUnlock(val);
+  if(val === JARVIS_PASSPHRASE){
+    unlocked = true;
+    localStorage.setItem('jarvis_unlocked', 'true');
+    lockOverlay.style.display = 'none';
+  } else {
+    lockError.textContent = 'Incorrect passphrase.';
+    passphraseInput.value = '';
+  }
 });
 passphraseInput.addEventListener('keydown', e=>{
   if(e.key === 'Enter') unlockBtn.click();
 });
-
-function lockAgain(message){
-  localStorage.removeItem('jarvis_passphrase');
-  passphrase = '';
-  lockError.textContent = message || 'Incorrect passphrase.';
-  lockOverlay.style.display = 'flex';
-  passphraseInput.value = '';
-  passphraseInput.focus();
-}
 
 // Clock
 function updateClock(){
@@ -543,32 +536,49 @@ function speak(text){
   window.speechSynthesis.speak(utter);
 }
 
+const jokes = [
+  "I would tell you a joke about UDP, but you might not get it.",
+  "There are 10 types of people: those who understand binary, and those who don't.",
+  "I'm not saying I'm Batman. I'm just saying no one has ever seen me and Batman in the same room.",
+  "Why do programmers prefer dark mode? Because light attracts bugs.",
+  "As Mr. Stark would say — sometimes you gotta run before you can walk."
+];
+
 function processCommand(raw){
   const cmd = raw.trim();
   if(!cmd) return;
-  if(!passphrase){ lockOverlay.style.display = 'flex'; return; }
+  if(!unlocked){ lockOverlay.style.display = 'flex'; return; }
 
   addLog(cmd,'user');
   transcriptEl.textContent = cmd;
   body.classList.add('thinking');
-  statusText.textContent = 'THINKING';
+  statusText.textContent = 'LOOKING IT UP';
 
   const lower = cmd.toLowerCase();
 
-  // Fast local shortcuts — no API call needed, instant response
+  // Fast local shortcuts — instant, no lookup needed
   if(/^what time is it\.?$/.test(lower) || lower === 'time'){
     return respondLocally(`It's ${new Date().toLocaleTimeString('en-US',{hour12:true})}, sir.`);
   }
   if(/^what('?s| is) the date\.?$/.test(lower)){
     return respondLocally(`Today is ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}.`);
   }
+  if(/joke/.test(lower)){
+    return respondLocally(jokes[Math.floor(Math.random()*jokes.length)]);
+  }
   if(/^clear log\.?$/.test(lower)){
     logEl.innerHTML = '';
     return respondLocally('Log cleared.');
   }
+  if(/calculate|^\d.*[\+\-\*\/]|times|plus|minus|divided/.test(lower)){
+    return respondLocally(tryCalculate(lower));
+  }
+  if(/hello|hey jarvis|^hi\b/.test(lower)){
+    return respondLocally('At your service.');
+  }
 
-  // Everything else goes to real Claude, with web search available
-  askClaude(cmd);
+  // Everything else: try a free Wikipedia lookup first
+  lookupWeb(cmd);
 }
 
 function respondLocally(response){
@@ -579,53 +589,64 @@ function respondLocally(response){
   speak(response);
 }
 
-async function askClaude(message){
+function tryCalculate(text){
+  let expr = text
+    .replace(/what('?s| is)/g,'')
+    .replace(/calculate/g,'')
+    .replace(/plus/g,'+')
+    .replace(/minus/g,'-')
+    .replace(/times|multiplied by/g,'*')
+    .replace(/divided by/g,'/')
+    .replace(/[^0-9+\-*/.() ]/g,'')
+    .trim();
   try{
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        message,
-        passphrase,
-        history: conversationHistory,
-      }),
-    });
-
-    if(res.status === 401){
-      body.classList.remove('thinking');
-      lockAgain('Passphrase rejected by server.');
-      return;
+    const result = Function('"use strict";return ('+expr+')')();
+    if(typeof result === 'number' && !isNaN(result)){
+      return `That comes to ${result}.`;
     }
+  }catch(e){}
+  return "I couldn't parse that calculation — try something like 'calculate 12 times 8'.";
+}
 
-    if(!res.ok){
-      const errBody = await res.json().catch(()=>({}));
-      throw new Error(errBody.error || `Server error (${res.status})`);
+// Strip filler words so "what is the Eiffel Tower" -> "Eiffel Tower"
+function extractTopic(text){
+  return text
+    .replace(/^(hey jarvis[,]?\s*)/i,'')
+    .replace(/^(what('?s| is)|who('?s| is)|tell me about|search for|look up|google)\s+/i,'')
+    .replace(/\?$/,'')
+    .trim();
+}
+
+async function lookupWeb(query){
+  const topic = extractTopic(query);
+
+  try{
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
+
+    if(res.ok){
+      const data = await res.json();
+      if(data.extract && data.type !== 'disambiguation'){
+        const reply = data.extract;
+        body.classList.remove('thinking');
+        statusText.textContent = 'STANDING BY';
+        addLog(reply,'ai');
+        transcriptEl.textContent = reply;
+        speak(reply);
+        return;
+      }
     }
-
-    const data = await res.json();
-    const reply = data.reply || "I didn't get a usable response back — try rephrasing that.";
-
-    conversationHistory.push({ role: 'user', content: message });
-    if(data.assistantMessage){
-      conversationHistory.push(data.assistantMessage);
-    } else {
-      conversationHistory.push({ role: 'assistant', content: reply });
-    }
-    // Keep history bounded client-side too
-    if(conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
-
-    body.classList.remove('thinking');
-    statusText.textContent = 'STANDING BY';
-    addLog(reply,'ai');
-    transcriptEl.textContent = reply;
-    speak(reply);
-  } catch(err){
-    body.classList.remove('thinking');
-    statusText.textContent = 'STANDING BY';
-    const msg = `Connection error: ${err.message}`;
-    addLog(msg,'ai');
-    transcriptEl.textContent = msg;
+  } catch(e){
+    // fall through to Google fallback below
   }
+
+  // No good Wikipedia match — open real search results instead
+  const reply = `I couldn't find a quick answer, sir — opening a web search for "${topic}" instead.`;
+  body.classList.remove('thinking');
+  statusText.textContent = 'STANDING BY';
+  addLog(reply,'ai');
+  transcriptEl.textContent = reply;
+  speak(reply);
+  window.open(`https://www.google.com/search?q=${encodeURIComponent(topic)}`, '_blank');
 }
 
 // Text input handling
