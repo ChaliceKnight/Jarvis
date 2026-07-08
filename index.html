@@ -271,6 +271,66 @@ body.listening .mic-btn{border-color:var(--amber);color:var(--amber);box-shadow:
   line-height:1.6;
 }
 
+/* ---------- Lock screen ---------- */
+.lock-overlay{
+  position:fixed;
+  inset:0;
+  background:var(--void);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:22px;
+  z-index:999;
+}
+.lock-overlay .brand{font-size:24px;}
+.lock-box{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:16px;
+}
+.lock-box input{
+  width:280px;
+  background:var(--panel);
+  border:1px solid var(--panel-line);
+  color:var(--text);
+  font-family:'Share Tech Mono',monospace;
+  font-size:15px;
+  letter-spacing:2px;
+  padding:12px 16px;
+  border-radius:4px;
+  outline:none;
+  text-align:center;
+}
+.lock-box input:focus{border-color:var(--core-dim);}
+.lock-box button{
+  background:rgba(51,232,255,0.08);
+  border:1px solid var(--core-dim);
+  color:var(--core);
+  font-family:'Orbitron',sans-serif;
+  font-size:12px;
+  letter-spacing:3px;
+  padding:12px 28px;
+  border-radius:4px;
+  cursor:pointer;
+}
+.lock-box button:hover{background:rgba(51,232,255,0.16);}
+.lock-error{
+  color:var(--danger);
+  font-size:12px;
+  letter-spacing:1px;
+  min-height:16px;
+}
+.lock-hint{
+  color:var(--text-dim);
+  font-size:11px;
+  letter-spacing:1px;
+  max-width:320px;
+  text-align:center;
+  line-height:1.6;
+}
+
 footer{
   text-align:center;
   padding:10px;
@@ -293,6 +353,16 @@ footer{
 </style>
 </head>
 <body>
+
+<div class="lock-overlay" id="lockOverlay">
+  <div class="brand">J.A.R.V.I.S.<span>ACCESS RESTRICTED</span></div>
+  <div class="lock-box">
+    <input type="password" id="passphraseInput" placeholder="Enter passphrase" autocomplete="off">
+    <button id="unlockBtn">UNLOCK</button>
+    <div class="lock-error" id="lockError"></div>
+  </div>
+  <div class="lock-hint">This instance is connected to Claude and restricted to authorized use only.</div>
+</div>
 
 <header>
   <div class="brand">J.A.R.V.I.S.<span>JUST A RATHER VERY INTELLIGENT SYSTEM</span></div>
@@ -319,11 +389,10 @@ footer{
 
     <h3 style="margin-top:26px;">QUICK COMMANDS</h3>
     <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-dim);line-height:1.9;">
-      <div>"Search for [anything]"</div>
+      <div>Ask me anything</div>
+      <div>"What's the latest on…"</div>
       <div>"What time is it"</div>
       <div>"What's the date"</div>
-      <div>"Tell me a joke"</div>
-      <div>"Calculate 12 times 8"</div>
       <div>"Clear log"</div>
     </div>
   </section>
@@ -368,9 +437,12 @@ footer{
   </section>
 </main>
 
-<footer>STARK-CLASS INTERFACE SIMULATION · RUNS ENTIRELY IN-BROWSER · NO DATA LEAVES THIS DEVICE</footer>
+<footer>CONNECTED TO CLAUDE · ACCESS RESTRICTED · WEB SEARCH ENABLED</footer>
 
 <script>
+// ===== CONFIG: paste your deployed Worker URL here =====
+const WORKER_URL = 'https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev';
+
 const body = document.body;
 const micBtn = document.getElementById('micBtn');
 const statusText = document.getElementById('statusText');
@@ -382,6 +454,45 @@ const statVoice = document.getElementById('stat-voice');
 const statSession = document.getElementById('stat-session');
 const bar1 = document.getElementById('bar1');
 const bar2 = document.getElementById('bar2');
+const lockOverlay = document.getElementById('lockOverlay');
+const passphraseInput = document.getElementById('passphraseInput');
+const unlockBtn = document.getElementById('unlockBtn');
+const lockError = document.getElementById('lockError');
+
+let passphrase = localStorage.getItem('jarvis_passphrase') || '';
+let conversationHistory = [];
+
+function tryUnlock(pass){
+  passphrase = pass;
+  lockOverlay.style.display = 'none';
+  localStorage.setItem('jarvis_passphrase', pass);
+}
+
+if(passphrase){
+  tryUnlock(passphrase);
+} else {
+  lockOverlay.style.display = 'flex';
+  setTimeout(()=>passphraseInput.focus(), 100);
+}
+
+unlockBtn.addEventListener('click', ()=>{
+  const val = passphraseInput.value.trim();
+  if(!val){ lockError.textContent = 'Enter a passphrase.'; return; }
+  lockError.textContent = '';
+  tryUnlock(val);
+});
+passphraseInput.addEventListener('keydown', e=>{
+  if(e.key === 'Enter') unlockBtn.click();
+});
+
+function lockAgain(message){
+  localStorage.removeItem('jarvis_passphrase');
+  passphrase = '';
+  lockError.textContent = message || 'Incorrect passphrase.';
+  lockOverlay.style.display = 'flex';
+  passphraseInput.value = '';
+  passphraseInput.focus();
+}
 
 // Clock
 function updateClock(){
@@ -432,78 +543,89 @@ function speak(text){
   window.speechSynthesis.speak(utter);
 }
 
-const jokes = [
-  "I would tell you a joke about UDP, but you might not get it.",
-  "There are 10 types of people: those who understand binary, and those who don't.",
-  "I'm not saying I'm Batman. I'm just saying no one has ever seen me and Batman in the same room.",
-  "Why do programmers prefer dark mode? Because light attracts bugs.",
-  "As Mr. Stark would say — sometimes you gotta run before you can walk."
-];
-
 function processCommand(raw){
   const cmd = raw.trim();
   if(!cmd) return;
+  if(!passphrase){ lockOverlay.style.display = 'flex'; return; }
+
   addLog(cmd,'user');
   transcriptEl.textContent = cmd;
   body.classList.add('thinking');
+  statusText.textContent = 'THINKING';
 
-  setTimeout(()=>{
-    body.classList.remove('thinking');
-    const lower = cmd.toLowerCase();
-    let response;
+  const lower = cmd.toLowerCase();
 
-    const searchMatch = lower.match(/^(?:hey jarvis[,]?\s*)?(?:please\s*)?search(?: the web| the internet| online)? for (.+)$/)
-      || lower.match(/^(?:hey jarvis[,]?\s*)?(?:please\s*)?(?:google|look up) (.+)$/);
+  // Fast local shortcuts — no API call needed, instant response
+  if(/^what time is it\.?$/.test(lower) || lower === 'time'){
+    return respondLocally(`It's ${new Date().toLocaleTimeString('en-US',{hour12:true})}, sir.`);
+  }
+  if(/^what('?s| is) the date\.?$/.test(lower)){
+    return respondLocally(`Today is ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}.`);
+  }
+  if(/^clear log\.?$/.test(lower)){
+    logEl.innerHTML = '';
+    return respondLocally('Log cleared.');
+  }
 
-    if(searchMatch){
-      const query = searchMatch[1].trim();
-      response = `Searching the web for ${query}, sir.`;
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
-    } else if(/time/.test(lower)){
-      response = `It's ${new Date().toLocaleTimeString('en-US',{hour12:true})}, sir.`;
-    } else if(/date|day is it/.test(lower)){
-      response = `Today is ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}.`;
-    } else if(/joke/.test(lower)){
-      response = jokes[Math.floor(Math.random()*jokes.length)];
-    } else if(/clear log/.test(lower)){
-      logEl.innerHTML = '';
-      response = "Log cleared.";
-    } else if(/calculate|what('?s| is)\s.*[\d]/.test(lower) || /\+|\-|times|plus|minus|divided|multiplied/.test(lower)){
-      response = tryCalculate(lower);
-    } else if(/hello|hey jarvis|hi there/.test(lower)){
-      response = "At your service.";
-    } else if(/who are you|your name/.test(lower)){
-      response = "I'm JARVIS — Just A Rather Very Intelligent System, built for this interface.";
-    } else if(/thank/.test(lower)){
-      response = "Of course, sir.";
-    } else {
-      response = `I heard: "${cmd}". Try "search for ${cmd}" and I'll pull that up on the web for you.`;
-    }
-
-    addLog(response,'ai');
-    transcriptEl.textContent = response;
-    speak(response);
-  }, 700 + Math.random()*500);
+  // Everything else goes to real Claude, with web search available
+  askClaude(cmd);
 }
 
-function tryCalculate(text){
-  let expr = text
-    .replace(/what('?s| is)/g,'')
-    .replace(/calculate/g,'')
-    .replace(/plus/g,'+')
-    .replace(/minus/g,'-')
-    .replace(/times|multiplied by/g,'*')
-    .replace(/divided by/g,'/')
-    .replace(/[^0-9+\-*/.() ]/g,'')
-    .trim();
+function respondLocally(response){
+  body.classList.remove('thinking');
+  statusText.textContent = 'STANDING BY';
+  addLog(response,'ai');
+  transcriptEl.textContent = response;
+  speak(response);
+}
+
+async function askClaude(message){
   try{
-    // eslint-disable-next-line no-eval
-    const result = Function('"use strict";return ('+expr+')')();
-    if(typeof result === 'number' && !isNaN(result)){
-      return `That comes to ${result}.`;
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        message,
+        passphrase,
+        history: conversationHistory,
+      }),
+    });
+
+    if(res.status === 401){
+      body.classList.remove('thinking');
+      lockAgain('Passphrase rejected by server.');
+      return;
     }
-  }catch(e){}
-  return "I couldn't parse that calculation — try something like 'calculate 12 times 8'.";
+
+    if(!res.ok){
+      const errBody = await res.json().catch(()=>({}));
+      throw new Error(errBody.error || `Server error (${res.status})`);
+    }
+
+    const data = await res.json();
+    const reply = data.reply || "I didn't get a usable response back — try rephrasing that.";
+
+    conversationHistory.push({ role: 'user', content: message });
+    if(data.assistantMessage){
+      conversationHistory.push(data.assistantMessage);
+    } else {
+      conversationHistory.push({ role: 'assistant', content: reply });
+    }
+    // Keep history bounded client-side too
+    if(conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+
+    body.classList.remove('thinking');
+    statusText.textContent = 'STANDING BY';
+    addLog(reply,'ai');
+    transcriptEl.textContent = reply;
+    speak(reply);
+  } catch(err){
+    body.classList.remove('thinking');
+    statusText.textContent = 'STANDING BY';
+    const msg = `Connection error: ${err.message}`;
+    addLog(msg,'ai');
+    transcriptEl.textContent = msg;
+  }
 }
 
 // Text input handling
