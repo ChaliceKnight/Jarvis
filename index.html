@@ -319,6 +319,7 @@ footer{
 
     <h3 style="margin-top:26px;">QUICK COMMANDS</h3>
     <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-dim);line-height:1.9;">
+      <div>"Search for [anything]"</div>
       <div>"What time is it"</div>
       <div>"What's the date"</div>
       <div>"Tell me a joke"</div>
@@ -451,7 +452,14 @@ function processCommand(raw){
     const lower = cmd.toLowerCase();
     let response;
 
-    if(/time/.test(lower)){
+    const searchMatch = lower.match(/^(?:hey jarvis[,]?\s*)?(?:please\s*)?search(?: the web| the internet| online)? for (.+)$/)
+      || lower.match(/^(?:hey jarvis[,]?\s*)?(?:please\s*)?(?:google|look up) (.+)$/);
+
+    if(searchMatch){
+      const query = searchMatch[1].trim();
+      response = `Searching the web for ${query}, sir.`;
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+    } else if(/time/.test(lower)){
       response = `It's ${new Date().toLocaleTimeString('en-US',{hour12:true})}, sir.`;
     } else if(/date|day is it/.test(lower)){
       response = `Today is ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}.`;
@@ -469,7 +477,7 @@ function processCommand(raw){
     } else if(/thank/.test(lower)){
       response = "Of course, sir.";
     } else {
-      response = `I heard: "${cmd}". I don't have a live connection for that yet, but the command's logged.`;
+      response = `I heard: "${cmd}". Try "search for ${cmd}" and I'll pull that up on the web for you.`;
     }
 
     addLog(response,'ai');
