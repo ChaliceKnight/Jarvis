@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>J.A.R.V.I.S.</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="theme-color" content="#04070b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+:root{
+  --void:#04070b;
+  --panel:#0a141f;
+  --panel-line:#123244;
+  --core:#33e8ff;
+  --core-dim:#0f8fae;
+  --amber:#ffb454;
+  --text:#d9f4ff;
+  --text-dim:#5f8ba0;
+  --danger:#ff5c5c;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+
+html,body{
+  width:100%;height:100%;
+  background:var(--void);
+  color:var(--text);
+  font-family:'Rajdhani',sans-serif;
+  overflow:hidden;
+}
+
+body{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(51,232,255,0.07), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(51,232,255,0.015) 0px, rgba(51,232,255,0.015) 1px, transparent 1px, transparent 3px),
+    var(--void);
+}
+
+/* ---------- Header ---------- */
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:18px 32px;
+  border-bottom:1px solid var(--panel-line);
+  flex-shrink:0;
+}
+.brand{
+  font-family:'Orbitron',sans-serif;
+  font-weight:700;
+  letter-spacing:6px;
+  font-size:20px;
+  color:var(--core);
+  text-shadow:0 0 12px rgba(51,232,255,0.6);
+}
+.brand span{color:var(--text-dim);font-weight:400;letter-spacing:3px;font-size:12px;display:block;margin-top:2px;text-shadow:none;}
+.clock{
+  font-family:'Share Tech Mono',monospace;
+  text-align:right;
+  color:var(--text);
+  font-size:15px;
+  letter-spacing:2px;
+}
+.clock .date{color:var(--text-dim);font-size:11px;letter-spacing:2px;}
+
+/* ---------- Main grid ---------- */
+main{
+  flex:1;
+  display:grid;
+  grid-template-columns:260px 1fr 260px;
+  gap:0;
+  min-height:0;
+}
+
+.panel{
+  padding:22px;
+  border-right:1px solid var(--panel-line);
+  overflow-y:auto;
+}
+.panel:last-child{border-right:none;border-left:1px solid var(--panel-line);}
+
+.panel h3{
+  font-family:'Orbitron',sans-serif;
+  font-size:11px;
+  letter-spacing:3px;
+  color:var(--core-dim);
+  margin-bottom:14px;
+  padding-bottom:8px;
+  border-bottom:1px solid var(--panel-line);
+}
+
+.stat-row{
+  display:flex;
+  justify-content:space-between;
+  font-size:13px;
+  padding:7px 0;
+  color:var(--text-dim);
+  border-bottom:1px solid rgba(18,50,68,0.5);
+}
+.stat-row b{color:var(--text);font-weight:600;}
+
+.bar-track{
+  height:5px;
+  background:rgba(51,232,255,0.08);
+  border-radius:3px;
+  margin-top:6px;
+  overflow:hidden;
+}
+.bar-fill{
+  height:100%;
+  background:linear-gradient(90deg,var(--core-dim),var(--core));
+  box-shadow:0 0 8px var(--core);
+  transition:width 0.6s ease;
+}
+
+.log{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  font-family:'Share Tech Mono',monospace;
+  font-size:11.5px;
+}
+.log-entry{
+  color:var(--text-dim);
+  border-left:2px solid var(--panel-line);
+  padding-left:8px;
+  line-height:1.5;
+}
+.log-entry.user{color:var(--amber);border-left-color:var(--amber);}
+.log-entry.ai{color:var(--core);border-left-color:var(--core);}
+
+/* ---------- Center core ---------- */
+.core-wrap{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:28px;
+  position:relative;
+}
+
+.core-stage{
+  width:320px;
+  height:320px;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+svg.core-svg{width:100%;height:100%;overflow:visible;}
+
+.ring{
+  fill:none;
+  stroke:var(--core-dim);
+  stroke-width:1;
+  opacity:0.5;
+  transform-origin:center;
+}
+.ring.spin-slow{animation:spin 20s linear infinite;}
+.ring.spin-rev{animation:spin 14s linear infinite reverse;}
+.ring.spin-fast{animation:spin 8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.core-center{
+  fill:var(--core);
+  filter:drop-shadow(0 0 18px var(--core));
+  transform-origin:center;
+  animation:pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1);opacity:0.85;}
+  50%{transform:scale(1.08);opacity:1;}
+}
+
+body.listening .core-center{animation:listenPulse 0.9s ease-in-out infinite;}
+@keyframes listenPulse{
+  0%,100%{transform:scale(1);opacity:0.9;}
+  50%{transform:scale(1.25);opacity:1;}
+}
+body.listening .ring{stroke:var(--amber);}
+body.listening .core-center{fill:var(--amber);filter:drop-shadow(0 0 22px var(--amber));}
+
+body.thinking .ring.spin-slow{animation-duration:2s;}
+body.thinking .ring.spin-rev{animation-duration:1.4s;}
+body.thinking .ring.spin-fast{animation-duration:0.8s;}
+
+.status-text{
+  font-family:'Orbitron',sans-serif;
+  letter-spacing:4px;
+  font-size:13px;
+  color:var(--text-dim);
+  text-align:center;
+  min-height:20px;
+}
+body.listening .status-text{color:var(--amber);}
+body.thinking .status-text{color:var(--core);}
+
+.transcript{
+  min-height:26px;
+  font-size:17px;
+  color:var(--text);
+  text-align:center;
+  max-width:480px;
+  padding:0 20px;
+}
+
+.mic-btn{
+  width:64px;height:64px;
+  border-radius:50%;
+  border:2px solid var(--core-dim);
+  background:rgba(51,232,255,0.05);
+  color:var(--core);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:all 0.2s ease;
+}
+.mic-btn:hover{background:rgba(51,232,255,0.15);box-shadow:0 0 20px rgba(51,232,255,0.4);}
+.mic-btn svg{width:26px;height:26px;}
+body.listening .mic-btn{border-color:var(--amber);color:var(--amber);box-shadow:0 0 24px rgba(255,180,84,0.5);}
+
+.text-input-row{
+  display:flex;
+  gap:10px;
+  width:420px;
+  max-width:90%;
+}
+.text-input-row input{
+  flex:1;
+  background:var(--panel);
+  border:1px solid var(--panel-line);
+  color:var(--text);
+  font-family:'Rajdhani',sans-serif;
+  font-size:14px;
+  padding:10px 14px;
+  border-radius:4px;
+  outline:none;
+}
+.text-input-row input:focus{border-color:var(--core-dim);}
+.text-input-row button{
+  background:transparent;
+  border:1px solid var(--core-dim);
+  color:var(--core);
+  font-family:'Orbitron',sans-serif;
+  font-size:11px;
+  letter-spacing:2px;
+  padding:0 18px;
+  border-radius:4px;
+  cursor:pointer;
+}
+.text-input-row button:hover{background:rgba(51,232,255,0.1);}
+
+.unsupported{
+  font-size:12px;
+  color:var(--text-dim);
+  max-width:400px;
+  text-align:center;
+  line-height:1.6;
+}
+
+footer{
+  text-align:center;
+  padding:10px;
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--text-dim);
+  font-family:'Share Tech Mono',monospace;
+  border-top:1px solid var(--panel-line);
+  flex-shrink:0;
+}
+
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-thumb{background:var(--panel-line);border-radius:3px;}
+
+@media (max-width:900px){
+  main{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}
+  .panel{border-right:none;border-bottom:1px solid var(--panel-line);max-height:160px;}
+  .panel:last-child{border-left:none;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">J.A.R.V.I.S.<span>JUST A RATHER VERY INTELLIGENT SYSTEM</span></div>
+  <div class="clock">
+    <div id="time">00:00:00</div>
+    <div class="date" id="date">—</div>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <h3>SYSTEM STATUS</h3>
+    <div class="stat-row"><span>Core</span><b id="stat-core">ONLINE</b></div>
+    <div class="stat-row"><span>Voice Engine</span><b id="stat-voice">CHECKING…</b></div>
+    <div class="stat-row"><span>Session</span><b id="stat-session">00:00</b></div>
+    <div style="margin-top:16px;">
+      <div class="stat-row" style="border:none;"><span>Processing Load</span></div>
+      <div class="bar-track"><div class="bar-fill" id="bar1" style="width:22%;"></div></div>
+    </div>
+    <div style="margin-top:12px;">
+      <div class="stat-row" style="border:none;"><span>Signal Integrity</span></div>
+      <div class="bar-track"><div class="bar-fill" id="bar2" style="width:88%;"></div></div>
+    </div>
+
+    <h3 style="margin-top:26px;">QUICK COMMANDS</h3>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-dim);line-height:1.9;">
+      <div>"What time is it"</div>
+      <div>"What's the date"</div>
+      <div>"Tell me a joke"</div>
+      <div>"Calculate 12 times 8"</div>
+      <div>"Clear log"</div>
+    </div>
+  </section>
+
+  <section class="core-wrap">
+    <div class="core-stage">
+      <svg class="core-svg" viewBox="0 0 200 200">
+        <circle class="ring spin-slow" cx="100" cy="100" r="94"/>
+        <circle class="ring spin-rev" cx="100" cy="100" r="78" stroke-dasharray="4 6"/>
+        <circle class="ring spin-fast" cx="100" cy="100" r="62" stroke-dasharray="1 4"/>
+        <circle class="core-center" cx="100" cy="100" r="26"/>
+      </svg>
+    </div>
+
+    <div class="status-text" id="statusText">STANDING BY</div>
+    <div class="transcript" id="transcript">Tap the mic or type a command below.</div>
+
+    <button class="mic-btn" id="micBtn" title="Toggle voice input">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </button>
+
+    <div class="text-input-row">
+      <input type="text" id="textInput" placeholder="Or type a command…">
+      <button id="sendBtn">SEND</button>
+    </div>
+
+    <div class="unsupported" id="unsupportedNote" style="display:none;">
+      Voice recognition isn't supported in this browser. Try Chrome or Edge for full voice control — text commands work everywhere.
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>COMMAND LOG</h3>
+    <div class="log" id="log">
+      <div class="log-entry ai">JARVIS initialized. Awaiting instruction.</div>
+    </div>
+  </section>
+</main>
+
+<footer>STARK-CLASS INTERFACE SIMULATION · RUNS ENTIRELY IN-BROWSER · NO DATA LEAVES THIS DEVICE</footer>
+
+<script>
+const body = document.body;
+const micBtn = document.getElementById('micBtn');
+const statusText = document.getElementById('statusText');
+const transcriptEl = document.getElementById('transcript');
+const logEl = document.getElementById('log');
+const textInput = document.getElementById('textInput');
+const sendBtn = document.getElementById('sendBtn');
+const statVoice = document.getElementById('stat-voice');
+const statSession = document.getElementById('stat-session');
+const bar1 = document.getElementById('bar1');
+const bar2 = document.getElementById('bar2');
+
+// Clock
+function updateClock(){
+  const now = new Date();
+  document.getElementById('time').textContent = now.toLocaleTimeString('en-US',{hour12:false});
+  document.getElementById('date').textContent = now.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+updateClock();
+setInterval(updateClock,1000);
+
+// Session timer
+const startTime = Date.now();
+setInterval(()=>{
+  const s = Math.floor((Date.now()-startTime)/1000);
+  const m = String(Math.floor(s/60)).padStart(2,'0');
+  const sec = String(s%60).padStart(2,'0');
+  statSession.textContent = `${m}:${sec}`;
+},1000);
+
+// Ambient stat jitter
+setInterval(()=>{
+  bar1.style.width = (15+Math.random()*25)+'%';
+  bar2.style.width = (75+Math.random()*20)+'%';
+},2500);
+
+function addLog(text, cls){
+  const div = document.createElement('div');
+  div.className = 'log-entry '+cls;
+  const t = new Date().toLocaleTimeString('en-US',{hour12:false});
+  div.textContent = `[${t}] ${text}`;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// Speech synthesis
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 1.02;
+  utter.pitch = 0.85;
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v=>/male|daniel|google uk english male/i.test(v.name)) || voices[0];
+  if(preferred) utter.voice = preferred;
+  body.classList.add('thinking');
+  utter.onstart = ()=>{ body.classList.remove('thinking'); statusText.textContent='RESPONDING'; };
+  utter.onend = ()=>{ statusText.textContent='STANDING BY'; };
+  window.speechSynthesis.speak(utter);
+}
+
+const jokes = [
+  "I would tell you a joke about UDP, but you might not get it.",
+  "There are 10 types of people: those who understand binary, and those who don't.",
+  "I'm not saying I'm Batman. I'm just saying no one has ever seen me and Batman in the same room.",
+  "Why do programmers prefer dark mode? Because light attracts bugs.",
+  "As Mr. Stark would say — sometimes you gotta run before you can walk."
+];
+
+function processCommand(raw){
+  const cmd = raw.trim();
+  if(!cmd) return;
+  addLog(cmd,'user');
+  transcriptEl.textContent = cmd;
+  body.classList.add('thinking');
+
+  setTimeout(()=>{
+    body.classList.remove('thinking');
+    const lower = cmd.toLowerCase();
+    let response;
+
+    if(/time/.test(lower)){
+      response = `It's ${new Date().toLocaleTimeString('en-US',{hour12:true})}, sir.`;
+    } else if(/date|day is it/.test(lower)){
+      response = `Today is ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}.`;
+    } else if(/joke/.test(lower)){
+      response = jokes[Math.floor(Math.random()*jokes.length)];
+    } else if(/clear log/.test(lower)){
+      logEl.innerHTML = '';
+      response = "Log cleared.";
+    } else if(/calculate|what('?s| is)\s.*[\d]/.test(lower) || /\+|\-|times|plus|minus|divided|multiplied/.test(lower)){
+      response = tryCalculate(lower);
+    } else if(/hello|hey jarvis|hi there/.test(lower)){
+      response = "At your service.";
+    } else if(/who are you|your name/.test(lower)){
+      response = "I'm JARVIS — Just A Rather Very Intelligent System, built for this interface.";
+    } else if(/thank/.test(lower)){
+      response = "Of course, sir.";
+    } else {
+      response = `I heard: "${cmd}". I don't have a live connection for that yet, but the command's logged.`;
+    }
+
+    addLog(response,'ai');
+    transcriptEl.textContent = response;
+    speak(response);
+  }, 700 + Math.random()*500);
+}
+
+function tryCalculate(text){
+  let expr = text
+    .replace(/what('?s| is)/g,'')
+    .replace(/calculate/g,'')
+    .replace(/plus/g,'+')
+    .replace(/minus/g,'-')
+    .replace(/times|multiplied by/g,'*')
+    .replace(/divided by/g,'/')
+    .replace(/[^0-9+\-*/.() ]/g,'')
+    .trim();
+  try{
+    // eslint-disable-next-line no-eval
+    const result = Function('"use strict";return ('+expr+')')();
+    if(typeof result === 'number' && !isNaN(result)){
+      return `That comes to ${result}.`;
+    }
+  }catch(e){}
+  return "I couldn't parse that calculation — try something like 'calculate 12 times 8'.";
+}
+
+// Text input handling
+sendBtn.addEventListener('click', ()=>{
+  processCommand(textInput.value);
+  textInput.value='';
+});
+textInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ processCommand(textInput.value); textInput.value=''; }
+});
+
+// Speech recognition
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let isListening = false;
+
+if(SpeechRecognition){
+  statVoice.textContent = 'READY';
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = ()=>{
+    isListening = true;
+    body.classList.add('listening');
+    statusText.textContent = 'LISTENING';
+    transcriptEl.textContent = 'Listening…';
+  };
+
+  recognition.onresult = (event)=>{
+    let text = '';
+    for(let i=event.resultIndex;i<event.results.length;i++){
+      text += event.results[i][0].transcript;
+    }
+    transcriptEl.textContent = text;
+    if(event.results[event.results.length-1].isFinal){
+      processCommand(text);
+    }
+  };
+
+  recognition.onerror = (e)=>{
+    addLog('Voice error: '+e.error,'ai');
+    stopListening();
+  };
+
+  recognition.onend = ()=>{
+    stopListening();
+  };
+} else {
+  statVoice.textContent = 'UNAVAILABLE';
+  document.getElementById('unsupportedNote').style.display = 'block';
+  micBtn.style.opacity = '0.4';
+  micBtn.style.cursor = 'not-allowed';
+}
+
+function stopListening(){
+  isListening = false;
+  body.classList.remove('listening');
+  if(statusText.textContent === 'LISTENING') statusText.textContent = 'STANDING BY';
+}
+
+micBtn.addEventListener('click', ()=>{
+  if(!recognition) return;
+  if(isListening){
+    recognition.stop();
+  } else {
+    try{ recognition.start(); }catch(e){}
+  }
+});
+
+// Greet on load
+setTimeout(()=>{
+  addLog('Systems nominal. Voice and text input ready.','ai');
+},600);
+
+// Register service worker for installable/offline app support
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./service-worker.js').catch(()=>{
+      // Fails silently if served over file:// or without HTTPS — app still works normally
+    });
+  });
+}
+
+// Optional: capture install prompt so a custom "Install App" affordance could be added later
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+</script>
+
+</body>
+</html>
